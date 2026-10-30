@@ -16,37 +16,6 @@ app = Flask(
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 
-def get_disposal_advice(label):
-    label = label.lower()
-
-    if "plastic" in label:
-        return "Empty and clean the item. Recycle it if accepted locally."
-
-    elif "paper" in label or "cardboard" in label:
-        return "Keep it dry and separate it for paper recycling."
-
-    elif "glass" in label:
-        return "Separate carefully. Wrap broken glass securely."
-
-    elif "metal" in label:
-        return "Separate it for appropriate metal recycling."
-
-    elif "biological" in label or "organic" in label:
-        return "Separate organic waste for composting where available."
-
-    elif "battery" in label or "electronic" in label:
-        return "Take it to an authorised battery or e-waste collection point."
-
-    elif "clothes" in label or "shoes" in label:
-        return "Consider reusing, donating, or using a textile collection service."
-
-    elif "trash" in label or "waste" in label:
-        return "Check the material and local waste disposal guidelines."
-
-    else:
-        return "Check the item's material and local waste disposal guidelines."
-
-
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -54,49 +23,46 @@ def home():
 
 @app.route("/upload", methods=["POST"])
 def upload_image():
-    image_file = request.files.get("image")
 
-    if not image_file or image_file.filename == "":
+    image = request.files.get("image")
+
+    if not image or image.filename == "":
         return jsonify({
-            "error": "Please select an image first."
+            "error": "Please select an image."
         }), 400
 
-    if not image_file.mimetype or not image_file.mimetype.startswith("image/"):
+    if not image.mimetype or not image.mimetype.startswith("image/"):
         return jsonify({
-            "error": "Please upload a valid image file."
+            "error": "Please upload an image file."
         }), 400
 
     try:
-        image = Image.open(
-            io.BytesIO(image_file.read())
+        img = Image.open(
+            io.BytesIO(image.read())
         ).convert("RGB")
 
-        result = classify_waste(image)
-
-        label = result["label"]
-        confidence = result["confidence"]
-        advice = get_disposal_advice(label)
+        result = classify_waste(img)
 
         return jsonify({
             "message": "AI analysis completed!",
-            "classification": label,
-            "confidence": confidence,
-            "advice": advice
+            "classification": result["label"],
+            "material": result["label"],
+            "category": result["category"],
+            "confidence": result["confidence"],
+            "disposal": result["disposal"]
         })
 
     except Exception:
-        app.logger.exception("Image analysis failed")
+        app.logger.exception("Image classification failed")
+
         return jsonify({
-            "error": "Unable to analyse this image. Please try another image."
+            "error": "Could not analyse this image. Please try again."
         }), 500
 
 
-@app.errorhandler(413)
-def file_too_large(error):
-    return jsonify({
-        "error": "Image is too large. Please upload an image under 10 MB."
-    }), 413
-
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        debug=False
+    )
