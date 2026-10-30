@@ -1,0 +1,6 @@
+Flask
+gunicorn
+Pillow
+transformers
+torch
+safetensors
